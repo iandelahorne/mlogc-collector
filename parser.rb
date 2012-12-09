@@ -93,7 +93,7 @@ module Mlogc
       matchdata = line.match /\[(.*)\] ([a-zA-Z0-9-]+) ([0-9\.]+) ([0-9]+) ([0-9\.]+) ([0-9]+)/
       if matchdata 
         @result[:audit]["timestamp"] = matchdata[1]
-        @result[:audit]["id"] = matchdata[2]
+        @result[:audit]["transaction_id"] = matchdata[2]
         @result[:audit]["source_ip"] = matchdata[3]
         @result[:audit]["source_port"] = matchdata[4]
         @result[:audit]["dest_ip"] = matchdata[5]
@@ -140,10 +140,12 @@ module Mlogc
       return if !@result[:audit][:headers].has_key? "Message"
       message = @result[:audit][:headers]["Message"]
       
-      matchdata =  message.match /\[file "(.*)"\] \[line "(.*)"\]/
+      matchdata =  message.match /\[file "(.*)"\] \[line "(.*)"\] (?:\[id "(.*)"\])?/
       if matchdata
         @result[:audit]["file"] = matchdata[1]
         @result[:audit]["line"] = matchdata[2]
+        @result[:audit]["id"] = matchdata[3] if matchdata.length == 4
+
       end
       matchdata = nil
       matchdata = message.match /Access denied with redirection to (.*) using .* (?:Pattern m|M)atch of \"(.*)\" against \"(.*)\" required/
