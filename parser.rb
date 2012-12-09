@@ -137,8 +137,9 @@ module Mlogc
     end
 
     def fix_audit
-      return if !@result[:audit].has_key? "Message"
-      message = @result[:audit]["Message"]
+      return if !@result[:audit][:headers].has_key? "Message"
+      message = @result[:audit][:headers]["Message"]
+      
       matchdata =  message.match /\[file "(.*)"\] \[line "(.*)"\]/
       if matchdata
         @result[:audit]["file"] = matchdata[1]
