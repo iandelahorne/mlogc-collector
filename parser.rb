@@ -19,7 +19,8 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-require 'rubygems' require 'rack/utils'
+require 'rubygems' 
+require 'rack/utils'
 
 module Mlogc
   class Parser 
@@ -38,48 +39,49 @@ module Mlogc
       "K" => "matched_rules",
       "Z" => "footer"
     }
-    attr_accessor :request, :req_headers, :response, :resp_headers, :req_body, :audit
+    attr_accessor :result
 
-    def parse_header(line, request, headers)
-      puts "parse_header req #{request}"
+    def parse_header(line, key)
       line.chomp!
       return if line.match /^\s*$/
       if line.match /^(GET|POST|PUT|HEAD)/ or line.match /^HTTP/
-        request = line
-        puts "asdf #{request}"
+        @result[key][:query] = line
         return
       end
       
-      (key,value) = line.split(": ", 2)
-      if !key or !value
+      (k,value) = line.split(": ", 2)
+      if !k or !value
         puts "parse_header - error with line #{line}"
       end
-      if !headers.has_key? key
-        headers[key] = value
-      elsif headers[key].is_a? String
-        headers[key] = [headers[key], value]
-      elsif headers[key].is_a? Array
-        headers[key] << vlaue
+      if !@result[key].has_key? :headers
+        @result[key][:headers] = Hash.new
+      end
+      headers = @result[key][:headers]
+      if !headers.has_key? k
+        headers[k] = value
+      elsif headers[k].is_a? String
+        headers[k] = [headers[k], value]
+      elsif headers[k].is_a? Array
+        headers[k] << value
       end
     end
 
     def parse_req_headers(line)
-      puts 'parse_req_headers'
-     parse_header(line, @request, @req_headers)
+      parse_header(line, :request)
     end
 
     def parse_resp_headers(line)
-      puts 'parse_resp_headers'
-      parse_header(line, response, resp_headers)
+      parse_header(line, :response)
     end
     
     def parse_req_body(line)
-      @req_body = Rack::Utils.parse_query(line)
+      @result[:request][:body] = Rack::Utils.parse_query(line)
     end
 
     def parse_audit(line)
-      parse_header(line, nil, @audit)
+      parse_header(line, :audit)
     end
+
     def parse_multipart_body(line)
         puts "parse_multipart_body #{line}"
     end
@@ -90,16 +92,17 @@ module Mlogc
     def parse_audit_header(line)
       matchdata = line.match /\[(.*)\] ([a-zA-Z0-9-]+) ([0-9\.]+) ([0-9]+) ([0-9\.]+) ([0-9]+)/
       if matchdata 
-        @audit["timestamp"] = matchdata[1]
-        @audit["id"] = matchdata[2]
-        @audit["source_ip"] = matchdata[3]
-        @audit["source_port"] = matchdata[4]
-        @audit["dest_ip"] = matchdata[5]
-        @audit["dest_port"] = matchdata[6]
+        @result[:audit]["timestamp"] = matchdata[1]
+        @result[:audit]["id"] = matchdata[2]
+        @result[:audit]["source_ip"] = matchdata[3]
+        @result[:audit]["source_port"] = matchdata[4]
+        @result[:audit]["dest_ip"] = matchdata[5]
+        @result[:audit]["dest_port"] = matchdata[6]
       else
         puts "parse_audit_header #{line}"
       end
     end
+
     def parse_line(phase, line) 
       case phase
       when "A"
@@ -132,42 +135,39 @@ module Mlogc
         end
       end
     end
+
     def fix_audit
-      return if !@audit.has_key? "Message"
-      message = @audit["Message"]
+      return if !@result[:audit].has_key? "Message"
+      message = @result[:audit]["Message"]
       matchdata =  message.match /\[file "(.*)"\] \[line "(.*)"\]/
       if matchdata
-        @audit["file"] = matchdata[1]
-        @audit["line"] = matchdata[2]
+        @result[:audit]["file"] = matchdata[1]
+        @result[:audit]["line"] = matchdata[2]
       end
       matchdata = nil
       matchdata = message.match /Access denied with redirection to (.*) using .* (?:Pattern m|M)atch of \"(.*)\" against \"(.*)\" required/
       if matchdata
-        @audit["redirect"] = matchdata[1]
-        @audit["pattern"] = matchdata[2]
-        @audit["against"] = matchdata[3]
+        @result[:audit]["redirect"] = matchdata[1]
+        @result[:audit]["pattern"] = matchdata[2]
+        @result[:audit]["against"] = matchdata[3]
       else
         matchdata = message.match /.*404.*Pattern match \"(.*)\" at/
         if matchdata 
-          @audit["pattern"] = matchdata[1]
+          @result[:audit]["pattern"] = matchdata[1]
         end
       end
     end
+
     def initialize(input)
-      @audit = Hash.new
-      @req_body = Hash.new
-      @response = ""
-      @resp_headers = Hash.new
-      @request = ""
-      @req_headers = Hash.new
+      @result = {:audit => Hash.new, 
+        :request => Hash.new,
+        :response => Hash.new}
       @phase = nil
       @id =  ""
-      @entry = Hash.new
       parse(input)
-      puts "request #{@request}"
-      puts "resp #{@response}"
       fix_audit
     end
+
   end  
 end
 

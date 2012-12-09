@@ -34,14 +34,7 @@ module Mlogc
       str = request.body.read 
       parser = Parser.new str
       logger.info str
-      out = {:audit => parser.audit,
-        :request => parser.request,
-        :request_headers => parser.req_headers,
-        :response => parser.response,
-        :response_headers => parser.resp_headers,
-        :request_body => parser.req_body
-      }
-      logger.info JSON.pretty_generate out
+      logger.info JSON.pretty_generate parser.result
     end
     
     get '/' do
